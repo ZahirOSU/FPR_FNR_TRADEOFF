@@ -1,40 +1,54 @@
-from macest.classification import models as macest_model
-from sklearn.metrics import precision_score, recall_score, accuracy_score
+from macest.classification.models import ModelWithConfidence
+from sklearn.metrics import precision_score, recall_score, accuracy_score, confusion_matrix
+import numpy as np
+import copy
 
 
-class FprFnrTradeoffModel:
+class FprFnrTradeoffModel(ModelWithConfidence):
+    POSITIVE = 'Positive'
+    NATURAL = 'Neutral'
+    NEGATIVE = 'Negative'
 
-    def __init__(self, model, X_conf_train, y_conf_train, threshold: float, critical: str = 'positive'):
-        assert 0 <= threshold < 1, 'the threshold must be between 0 and 1'
-        assert critical in ['positive', 'negative'], "dont_miss must be \'positive\' or \'negative\'"
-        self.model = model
-        self.macest_model = macest_model.ModelWithConfidence(model,
-                                                 X_conf_train,
-                                                 y_conf_train)
+    def __init__(self, *, threshold: float, **kwargs):
+        assert 0 <= threshold <= 1, 'The threshold must be between 0 and 1'
+
         self.threshold = threshold
-        self.critical = critical
 
-    def fit(self, X_cal, y_cal):
-        self.macest_model.fit(X_cal, y_cal)
+        super().__init__(**kwargs)
 
-    def predict(self, X_test):
-        xgboost_preds = self.model.predict(X_test)
-        macest_conf_preds = self.macest_model.predict_proba(X_test)
-        # xgboost_conf_preds = model.predict_proba(X_test)
-#         todo: if positive: take all class 0 predictions that are above the 1-threshold -> change to 1
-#           if negative: take all class 1 predictions that are under the threshold > change to 0
-        if self.critical == 'positive':
-            xgboost_preds[(xgboost_preds == 0) & (macest_conf_preds[:, 1] > 1-self.threshold)] = 1
-        if self.critical == 'negative':
-            xgboost_preds[(xgboost_preds == 1) & (macest_conf_preds[:, 1] < self.threshold)] = 0
+    @property
+    def critic_incorrect_preds(self) -> str:
+        # the threshold express the probability that the prediction is positive.
+        if self.threshold > 0.5:
+            # positive is more harmful > to remain positive a prediction need to pass high threshold.
+            return FprFnrTradeoffModel.POSITIVE
+        elif self.threshold < 0.5:
+            # negative is more harmful > change to positive require passing low threshold.
+            return FprFnrTradeoffModel.NEGATIVE
+        else:  # self.threshold == 0.5
+            return FprFnrTradeoffModel.NATURAL
+
+    def predict_with_tradeoff(self, base_model_pred: np.ndarray, X_test):
+        preds = copy.deepcopy(base_model_pred)
+        macest_conf_preds = self.predict_proba(X_test)
+
+        if self.critic_incorrect_preds == FprFnrTradeoffModel.POSITIVE:
+            # positive is more harmful > change only positive predictions to 0 if they are over the
+            # threshold (the threshold is high as it is the probability to be 1)
+            preds[(preds == 1) & (macest_conf_preds[:, 1] < self.threshold)] = 0
+        elif self.critic_incorrect_preds == FprFnrTradeoffModel.NEGATIVE:
+            # negative is more harmful > change only negative predictions to 1 if they are over the
+            # threshold (the threshold is low as it is the probability to be 1)
+            preds[(preds == 0) & (macest_conf_preds[:, 1] > self.threshold)] = 1
+        return preds
+
 
     @staticmethod
-    def _calc_false_positive_rate(y_true, y_pred):
-        pass
-
-    @staticmethod
-    def _calc_false_negative_rate(y_true, y_pred):
-        pass
+    def _calc_fpr_fnr(y_true, y_pred):
+        tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+        fpr = fp/(fp+tn)
+        fnr = fn/(tp+fn)
+        return fpr, fnr
 
     @staticmethod
     def _calc_precision(y_true, y_pred):
@@ -48,13 +62,8 @@ class FprFnrTradeoffModel:
     def _calc_accuracy(y_true, y_pred):
         return accuracy_score(y_true, y_pred)
 
-    @staticmethod
-    def calculate_metrics(y_true, y_pred):
-        false_positive_rate = FprFnrTradeoffModel._calc_false_positive_rate(y_true, y_pred)
-        false_negative_rate = FprFnrTradeoffModel._calc_false_negative_rate(y_true, y_pred)
-        precision = FprFnrTradeoffModel._calc_precision(y_true, y_pred)
-        recall = FprFnrTradeoffModel._calc_recall(y_true, y_pred)
-
-
-
-        
+    # @staticmethod
+    # def calculate_metrics(y_true, y_pred):
+    #     false_positive_rate, false_negative_rate = FprFnrTradeoffModel._calc_fpr_fnr(y_true, y_pred)
+    #     precision = FprFnrTradeoffModel._calc_precision(y_true, y_pred)
+    #     recall = FprFnrTradeoffModel._calc_recall(y_true, y_pred)
