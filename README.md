@@ -1,6 +1,6 @@
-# MACEst Notebooks
+# FPR FNR Tradeoff Module 
 
-This directory contains notebooks that showcase MACEst for classification and regression.
+This directory contains notebooks that showcase FPR and FNR tradeoff  which responsible to adjust the base predictions to meet the client False Positives and False Negatives requirement based on the confidence threshold.
 To use the notebooks as intended, please make sure that you install the Python libraries in your virtual environment
 from the `../requirements.txt` and `../requirements_notebooks.txt` files.
 
@@ -11,8 +11,5 @@ We recommend doing the following steps:
 to do this.
 3. Start Jupyter notebook server/Jupyter lab and use the added kernel that will include the installed dependencies.
 
-Notebooks are divided into two folders covering the two common Machine Learning problems:
-1. Classification (including comparison of MACEst with state of the art calibration methods)
-2. Regression
 
 [ipython_add_kernel]: https://janakiev.com/blog/jupyter-virtual-envs/
