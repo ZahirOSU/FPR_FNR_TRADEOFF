@@ -28,7 +28,7 @@ class FprFnrTradeoffModel(ModelWithConfidence):
         else:  # self.threshold == 0.5
             return FprFnrTradeoffModel.NATURAL
 
-    def predict_with_tradeoff(self, base_model_pred: np.ndarray, X_test):
+    def predict_with_tradeoff(self, base_model_pred: np.ndarray, X_test: np.ndarray):
         preds = copy.deepcopy(base_model_pred)
         macest_conf_preds = self.predict_proba(X_test)
 
@@ -61,9 +61,3 @@ class FprFnrTradeoffModel(ModelWithConfidence):
     @staticmethod
     def _calc_accuracy(y_true, y_pred):
         return accuracy_score(y_true, y_pred)
-
-    # @staticmethod
-    # def calculate_metrics(y_true, y_pred):
-    #     false_positive_rate, false_negative_rate = FprFnrTradeoffModel._calc_fpr_fnr(y_true, y_pred)
-    #     precision = FprFnrTradeoffModel._calc_precision(y_true, y_pred)
-    #     recall = FprFnrTradeoffModel._calc_recall(y_true, y_pred)
